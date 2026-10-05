@@ -1,9 +1,12 @@
 const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
+const dotenv = require("dotenv");
 
 const app = express();
 const server = http.createServer(app);
+
+dotenv.config();
 
 const wss = new WebSocket.Server({
     server,
@@ -105,6 +108,10 @@ wss.on("connection", (ws) => {
     });
 });
 
-server.listen(3000, () => {
-    console.log("🚀 Server running on http://localhost:3000");
+
+
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+    console.log(`🚀 Server ddc running on port ${PORT}`);
 });
