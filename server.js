@@ -292,16 +292,82 @@ Important:
 // Call Status
 // ===============================
 
-app.post("/call-status", (req, res) => {
+app.post("/call-status", async (req, res) => {
 
     console.log("📞 CALL STATUS");
 
-    console.log("Status:", req.body.CallStatus);
-    console.log("Call SID:", req.body.CallSid);
+    const status = req.body.CallStatus;
+    const callSid = req.body.CallSid;
+
+    console.log("Status:", status);
+    console.log("Call SID:", callSid);
+
+    // Save transcript only when call is completed
+    if (status === "completed") {
+
+        const history = conversations.get(callSid);
+
+        if (!history) {
+            console.log("⚠️ No conversation history found");
+            return res.sendStatus(200);
+        }
+
+        // Create readable transcript
+        const transcript = history
+            .filter(item => item.role === "user" || item.role === "assistant")
+            .map(item => {
+                const speaker =
+                    item.role === "user"
+                        ? "Patient"
+                        : "AI";
+
+                return `${speaker}: ${item.content}`;
+            })
+            .join("\n");
+
+        try {
+
+            const response = await fetch(
+                process.env.GOOGLE_SHEET_WEBHOOK_URL,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        callSid: callSid,
+                        dateTime: new Date().toISOString(),
+                        patient: "Voice Patient",
+                        transcript: transcript
+                    })
+                }
+            );
+
+            console.log(
+                "📊 Google Sheet status:",
+                response.status
+            );
+
+            console.log(
+                "📊 Transcript saved to Google Sheet"
+            );
+
+        } catch (error) {
+
+            console.error(
+                "❌ Google Sheet error:",
+                error
+            );
+        }
+
+        // Remove conversation from memory
+        conversations.delete(callSid);
+    }
 
     res.sendStatus(200);
 });
-
 
 // ===============================
 // WebSocket
