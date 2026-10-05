@@ -27,7 +27,7 @@ app.all("/voice", (req, res) => {
 
             <Gather
                 input="speech"
-                action="https://kelkoo-cia-kevin-smooth.trycloudflare.com/process-speech"
+                action="https://citycare-voice-ai-2.onrender.com/process-speech"
                 method="POST"
                 speechTimeout="auto">
 
