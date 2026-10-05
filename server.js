@@ -1,12 +1,10 @@
 const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
-const dotenv = require("dotenv");
 
 const app = express();
 const server = http.createServer(app);
 
-dotenv.config();
 
 const wss = new WebSocket.Server({
     server,
