@@ -5,20 +5,52 @@ const WebSocket = require("ws");
 const app = express();
 const server = http.createServer(app);
 
-
 const wss = new WebSocket.Server({
     server,
     path: "/media"
 });
 
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
+
+
+// ===============================
+// Conversation Memory
+// ===============================
+
+const conversations = new Map();
+
+
+// ===============================
+// XML Escape Helper
+// ===============================
+
+function escapeXml(text) {
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+}
+
+
+// ===============================
+// Home
+// ===============================
+
 app.get("/", (req, res) => {
     res.send("CityCare Voice AI Server is running");
 });
 
+
+// ===============================
+// Twilio Voice Webhook
+// ===============================
+
 app.all("/voice", (req, res) => {
 
     console.log("📞 Twilio requested /voice");
-    console.log("Method:", req.method);
 
     res.type("text/xml");
 
@@ -46,43 +78,224 @@ app.all("/voice", (req, res) => {
     `);
 });
 
-app.use(express.urlencoded({ extended: false }));
 
-app.post("/process-speech", (req, res) => {
+// ===============================
+// Speech Processing + Sarvam AI
+// ===============================
 
-    console.log("🗣️ Patient said:");
-    console.log(req.body.SpeechResult);
+app.post("/process-speech", async (req, res) => {
 
-    res.type("text/xml");
+    const speech = req.body.SpeechResult;
+    const callSid = req.body.CallSid;
 
-    res.send(`
-        <Response>
-            <Say>
-                I heard you say: ${req.body.SpeechResult}
-            </Say>
+    console.log("🗣️ Patient said:", speech);
+    console.log("📞 Call SID:", callSid);
 
-            <Say>
-                Thank you. This is the CityCare AI demo.
-            </Say>
-        </Response>
-    `);
+
+    if (!speech) {
+
+        res.type("text/xml");
+
+        return res.send(`
+            <Response>
+                <Say>
+                    Sorry, I could not understand you.
+                    Please say that again.
+                </Say>
+
+                <Gather
+                    input="speech"
+                    action="https://citycare-voice-ai-2.onrender.com/process-speech"
+                    method="POST"
+                    speechTimeout="auto">
+
+                    <Say>
+                        How can I help you?
+                    </Say>
+
+                </Gather>
+            </Response>
+        `);
+    }
+
+
+    // ===============================
+    // Get conversation history
+    // ===============================
+
+    let history = conversations.get(callSid);
+
+    if (!history) {
+
+        history = [
+            {
+                role: "system",
+                content: `
+You are the CityCare Multispeciality Hospital AI Assistant.
+
+You are speaking with a patient over a phone call.
+
+Your job is to:
+- Understand the patient's question.
+- Give short and simple answers.
+- Speak naturally like a helpful hospital assistant.
+- Support English, Hindi and Hinglish.
+- Ask one question at a time.
+- Help with appointments, hospital services, doctors and general patient queries.
+
+Important:
+- You are not a doctor.
+- Do not diagnose diseases.
+- Do not prescribe medicines.
+- For serious or emergency symptoms, advise the patient to seek immediate medical help or contact emergency services.
+- Keep voice responses short because the response will be spoken over a phone call.
+`
+            }
+        ];
+
+        conversations.set(callSid, history);
+    }
+
+
+    // Add patient message
+    history.push({
+        role: "user",
+        content: speech
+    });
+
+
+    try {
+
+        console.log("🤖 Sending request to Sarvam...");
+
+
+        // ===============================
+        // Sarvam API
+        // ===============================
+
+        const sarvamResponse = await fetch(
+            "https://api.sarvam.ai/v1/chat/completions",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json",
+                    "api-subscription-key": process.env.SARVAM_API_KEY
+                },
+
+                body: JSON.stringify({
+                    model: "sarvam-105b-conversations",
+
+                    messages: history,
+
+                    temperature: 0.2,
+
+                    max_tokens: 150,
+
+                    reasoning_effort: null
+                })
+            }
+        );
+
+
+        const data = await sarvamResponse.json();
+
+
+        console.log("🤖 Sarvam status:", sarvamResponse.status);
+
+
+        if (!sarvamResponse.ok) {
+
+            console.error("❌ Sarvam API Error:");
+            console.error(JSON.stringify(data, null, 2));
+
+            throw new Error("Sarvam API request failed");
+        }
+
+
+        // ===============================
+        // Get AI answer
+        // ===============================
+
+        const answer =
+            data?.choices?.[0]?.message?.content ||
+            "Sorry, I could not generate a response.";
+
+
+        console.log("🤖 AI:", answer);
+
+
+        // Save AI response
+        history.push({
+            role: "assistant",
+            content: answer
+        });
+
+
+        conversations.set(callSid, history);
+
+
+        // ===============================
+        // Send AI answer to Twilio
+        // ===============================
+
+        const safeAnswer = escapeXml(answer);
+
+
+        res.type("text/xml");
+
+        res.send(`
+            <Response>
+
+                <Gather
+                    input="speech"
+                    action="https://citycare-voice-ai-2.onrender.com/process-speech"
+                    method="POST"
+                    speechTimeout="auto">
+
+                    <Say>
+                        ${safeAnswer}
+                    </Say>
+
+                </Gather>
+
+                <Say>
+                    I did not receive your response. Goodbye.
+                </Say>
+
+            </Response>
+        `);
+
+
+    } catch (error) {
+
+        console.error("❌ ERROR:", error);
+
+
+        res.type("text/xml");
+
+        res.send(`
+            <Response>
+
+                <Say>
+                    Sorry, I am having trouble connecting to the AI assistant.
+                    Please try again later.
+                </Say>
+
+            </Response>
+        `);
+    }
 });
 
 
-
-app.post("/stream-status", (req, res) => {
-    console.log("📡 STREAM STATUS");
-    console.log("Event:", req.body.StreamEvent);
-    console.log("Error:", req.body.StreamError);
-    console.log("Call SID:", req.body.CallSid);
-    console.log("Stream SID:", req.body.StreamSid);
-
-    res.sendStatus(200);
-});
-
+// ===============================
+// Call Status
+// ===============================
 
 app.post("/call-status", (req, res) => {
+
     console.log("📞 CALL STATUS");
+
     console.log("Status:", req.body.CallStatus);
     console.log("Call SID:", req.body.CallSid);
 
@@ -90,26 +303,48 @@ app.post("/call-status", (req, res) => {
 });
 
 
+// ===============================
+// WebSocket
+// ===============================
+
 wss.on("connection", (ws) => {
+
     console.log("✅ Twilio connected to WebSocket");
 
     ws.on("message", (message) => {
-        console.log("📩 Message received from Twilio");
-        console.log(message.toString());
-    });
 
+        console.log("📩 Message received from Twilio");
+
+        console.log(message.toString());
+
+    });
 
     ws.on("close", (code, reason) => {
+
         console.log("❌ Twilio disconnected");
+
         console.log("Close Code:", code);
-        console.log("Close Reason:", reason.toString());
+
+        console.log(
+            "Close Reason:",
+            reason.toString()
+        );
+
     });
+
 });
 
 
+// ===============================
+// Server
+// ===============================
 
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-    console.log(`🚀 Server ddc running on port ${PORT}`);
+
+    console.log(
+        `🚀 Server running on port ${PORT}`
+    );
+
 });
