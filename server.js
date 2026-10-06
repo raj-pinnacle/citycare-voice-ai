@@ -54,28 +54,27 @@ app.all("/voice", (req, res) => {
 
     res.type("text/xml");
 
-    res.send(`
-        <Response>
+   res.send(`
+  <Response>
+    <Gather
+      input="speech"
+      action="https://citycare-voice-ai-2.onrender.com/process-speech"
+      method="POST"
+      speechTimeout="auto">
 
-            <Gather
-                input="speech"
-                action="https://citycare-voice-ai-2.onrender.com/process-speech"
-                method="POST"
-                speechTimeout="auto">
+      <Say voice="Polly.Kajal-Neural" language="hi-IN">
+        ${safeAnswer}
+      </Say>
 
-                <Say>
-                    Hello, I am CityCare Hospital AI Assistant.
-                    Please tell me how I can help you.
-                </Say>
+    </Gather>
 
-            </Gather>
+    <Say voice="Polly.Kajal-Neural" language="hi-IN">
+      I did not receive your response. Goodbye.
+    </Say>
 
-            <Say>
-                I did not receive your response. Goodbye.
-            </Say>
-
-        </Response>
-    `);
+  </Response>
+`);
+    
 });
 
 
