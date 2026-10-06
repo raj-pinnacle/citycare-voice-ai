@@ -54,28 +54,30 @@ app.all("/voice", (req, res) => {
 
     res.type("text/xml");
 
-   res.send(`
-  <Response>
-    <Gather
-      input="speech"
-      action="https://citycare-voice-ai-2.onrender.com/process-speech"
-      method="POST"
-      speechTimeout="auto">
+    res.send(`
+        <Response>
 
-      <Say voice="Polly.Kajal-Neural" language="hi-IN">
-        ${safeAnswer}
-      </Say>
+            <Gather
+                input="speech"
+                action="https://citycare-voice-ai-2.onrender.com/process-speech"
+                method="POST"
+                speechTimeout="auto">
 
-    </Gather>
+                <Say voice="Polly.Kajal-Neural" language="hi-IN">
+                    Namaste, main CityCare Hospital ka AI assistant hoon. Aapki kaise madad kar sakta hoon?
+                </Say>
 
-    <Say voice="Polly.Kajal-Neural" language="hi-IN">
-      I did not receive your response. Goodbye.
-    </Say>
+            </Gather>
 
-  </Response>
-`);
-    
+            <Say voice="Polly.Kajal-Neural" language="hi-IN">
+                I did not receive your response. Goodbye.
+            </Say>
+
+        </Response>
+    `);
+
 });
+    
 
 
 // ===============================
@@ -96,25 +98,27 @@ app.post("/process-speech", async (req, res) => {
         res.type("text/xml");
 
         return res.send(`
-            <Response>
-                <Say>
-                    Sorry, I could not understand you.
-                    Please say that again.
-                </Say>
+    <Response>
 
-                <Gather
-                    input="speech"
-                    action="https://citycare-voice-ai-2.onrender.com/process-speech"
-                    method="POST"
-                    speechTimeout="auto">
+        <Gather
+            input="speech"
+            action="https://citycare-voice-ai-2.onrender.com/process-speech"
+            method="POST"
+            speechTimeout="auto">
 
-                    <Say>
-                        How can I help you?
-                    </Say>
+            <Say voice="Polly.Kajal-Neural" language="hi-IN">
+                ${safeAnswer}
+            </Say>
 
-                </Gather>
-            </Response>
-        `);
+        </Gather>
+
+        <Say voice="Polly.Kajal-Neural" language="hi-IN">
+            I did not receive your response. Goodbye.
+        </Say>
+
+    </Response>
+    
+`);
     }
 
 
