@@ -93,33 +93,32 @@ app.post("/process-speech", async (req, res) => {
     console.log("📞 Call SID:", callSid);
 
 
-    if (!speech) {
+   if (!speech) {
 
-        res.type("text/xml");
+    res.type("text/xml");
 
-        return res.send(`
-    <Response>
-
-        <Gather
-            input="speech"
-            action="https://citycare-voice-ai-2.onrender.com/process-speech"
-            method="POST"
-            speechTimeout="auto">
+    return res.send(`
+        <Response>
 
             <Say voice="Polly.Kajal-Neural" language="hi-IN">
-                ${safeAnswer}
+                Sorry, main aapki baat samajh nahi paaya. Please dobara boliye.
             </Say>
 
-        </Gather>
+            <Gather
+                input="speech"
+                action="https://citycare-voice-ai-2.onrender.com/process-speech"
+                method="POST"
+                speechTimeout="auto">
 
-        <Say voice="Polly.Kajal-Neural" language="hi-IN">
-            I did not receive your response. Goodbye.
-        </Say>
+                <Say voice="Polly.Kajal-Neural" language="hi-IN">
+                    Aap kis cheez mein madad chahte hain?
+                </Say>
 
-    </Response>
-    
-`);
-    }
+            </Gather>
+
+        </Response>
+    `);
+}
 
 
     // ===============================
@@ -289,15 +288,14 @@ Your answer will be spoken aloud on a phone call, so keep it concise and convers
                     method="POST"
                     speechTimeout="auto">
 
-                    <Say>
-                        ${safeAnswer}
-                    </Say>
-
+                    <Say voice="Polly.Kajal-Neural" language="hi-IN">
+    ${safeAnswer}
+    </Say>
                 </Gather>
 
-                <Say>
-                    I did not receive your response. Goodbye.
-                </Say>
+              <Say voice="Polly.Kajal-Neural" language="hi-IN">
+            I did not receive your response. Goodbye.
+            </Say>
 
             </Response>
         `);
